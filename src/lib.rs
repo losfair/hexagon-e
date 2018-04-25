@@ -1,7 +1,9 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+#![no_std]
+
+extern crate byteorder;
+
+pub mod module;
+pub mod environment;
+pub mod vm;
+pub mod error;
+pub mod tape;
