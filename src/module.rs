@@ -36,8 +36,10 @@ pub enum Opcode {
     Drop = 1,
     Select,
 
-    SaveState,
-    RestoreState,
+    SaveSp,
+    RestoreSp,
+    SaveIp,
+    RestoreIp,
 
     ReserveStack,
     GetStack,

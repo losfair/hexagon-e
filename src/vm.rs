@@ -104,32 +104,35 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                         push1!(self.env, val2);
                     }
                 },
-                Opcode::SaveState => {
+                Opcode::SaveSp => {
                     let sp = state.sp;
-                    let ip = state.ip;
-
                     push1!(self.env, sp as _);
-                    push1!(self.env, ip as _);
 
                     let new_sp = self.env.get_stack().get_pos();
                     state.sp = new_sp;
-                    
-                    let new_ip = code.get_pos();
-                    state.ip = new_ip;
                 },
-                Opcode::RestoreState => {
-                    // We've already advanced to the next instruction after fetching.
-                    let ip = state.ip;
-                    code.set_pos(ip)?;
-
+                Opcode::RestoreSp => {
                     let sp = state.sp;
                     self.env.get_stack().set_pos(sp)?;
 
-                    let old_ip = pop1!(self.env);
                     let old_sp = pop1!(self.env);
-
-                    state.ip = old_ip as _;
                     state.sp = old_sp as _;
+                },
+                Opcode::SaveIp => {
+                    let ip = state.ip;
+                    push1!(self.env, ip as _);
+
+                    let new_ip = code.get_pos();
+                    state.ip = new_ip;
+                },
+                Opcode::RestoreIp => {
+                    // state.ip usually points at the `Jmp` opcode now.
+                    // So we need to move it forward by one.
+                    let ip = state.ip + 1;
+                    code.set_pos(ip)?;
+
+                    let old_ip = pop1!(self.env);
+                    state.ip = old_ip as _;
                 },
                 Opcode::ReserveStack => {
                     let n = code.next_u32()? as usize;
