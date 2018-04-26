@@ -36,20 +36,26 @@ pub enum Opcode {
     Drop = 1,
     Select,
 
-    SaveSp,
-    RestoreSp,
-    SaveIp,
-    RestoreIp,
+    Call,
+    Return,
+    Halt,
 
-    ReserveStack,
-    GetStack,
-    SetStack,
+    GetLocal,
+    SetLocal,
+    TeeLocal,
+
+    CurrentMemory,
+    GrowMemory,
+
+    Nop,
+    Unreachable,
 
     Jmp,
     JmpIf,
-    JmpIndirect,
-    JmpIndirectIf,
     JmpTable,
+
+    I32Load,
+    I32Store,
 
     I32Const,
     I32Add,

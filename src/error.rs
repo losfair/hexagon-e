@@ -2,6 +2,7 @@
 pub enum ExecuteError {
     Generic,
     Bounds,
+    Unreachable,
     IllegalOpcode
 }
 

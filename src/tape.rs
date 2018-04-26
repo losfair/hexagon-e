@@ -60,11 +60,24 @@ impl<'a, T: 'static> Tape<'a, T> {
         }
     }
 
-    pub fn current(&self) -> ExecuteResult<&T> {
-        if self.pos.get() < self.data.len() {
-            Ok(&self.data[self.pos.get()])
-        } else {
+    pub fn prev_many(&self, n: usize) -> ExecuteResult<&[T]> {
+        match self.tail_many(n) {
+            Ok(v) => {
+                // This should never fail
+                self.set_pos(self.get_pos() - n).unwrap();
+                Ok(v)
+            },
+            Err(e) => Err(e)
+        }
+    }
+
+    pub fn tail_many(&self, n: usize) -> ExecuteResult<&[T]> {
+        let pos = self.pos.get();
+
+        if n > pos {
             Err(ExecuteError::Bounds)
+        } else {
+            Ok(&self.data[pos - n .. pos])
         }
     }
 
