@@ -55,10 +55,33 @@ pub enum Opcode {
     JmpTable,
 
     I32Load,
+    I32Load8U,
+    I32Load8S,
+    I32Load16U,
+    I32Load16S,
     I32Store,
+    I32Store8,
+    I32Store16,
 
     I32Const,
+    I32Ctz,
+    I32Clz,
+    I32Popcnt,
     I32Add,
+    I32Sub,
+    I32Mul,
+    I32DivU,
+    I32DivS,
+    I32RemU,
+    I32RemS,
+    I32And,
+    I32Or,
+    I32Xor,
+    I32Shl,
+    I32ShrU,
+    I32ShrS,
+    I32Rotl,
+    I32Rotr,
 
     Never
 }

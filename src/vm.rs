@@ -114,24 +114,44 @@ macro_rules! tee_local {
 }
 
 macro_rules! load_val {
-    ($env:expr, $code:expr, $t: ty, $read:ident) => {
+    ($env:expr, $code:expr, $t1: ty, $t2: ty, $read:ident) => {
         let offset = $code.next_u32()? as usize;
         let addr = pop1!($env) as usize;
 
         let real_addr = offset + addr;
-        let val = $env.get_memory().$read(real_addr)? as $t;
+        let val = $env.get_memory().$read(real_addr)? as $t1 as $t2;
         push1!($env, val as u64 as _);
     }
 }
 
 macro_rules! store_val {
-    ($env:expr, $code:expr, $t:ty, $write:ident) => {
+    ($env:expr, $code:expr, $write:ident) => {
         let offset = $code.next_u32()? as usize;
-        let val = pop1!($env) as u64 as $t;
+        let val = pop1!($env) as u64 as _;
         let addr = pop1!($env) as usize;
 
         let real_addr = offset + addr;
         $env.get_memory_mut().$write(real_addr, val)?;
+    }
+}
+
+macro_rules! run_unop {
+    ($env:expr, $t:ty, $body:expr) => {
+        {
+            let v = pop1!($env);
+            let result = ($body)(v as $t) as $t;
+            push1!($env, result as u64 as i64);
+        }
+    }
+}
+
+macro_rules! run_binop {
+    ($env:expr, $t:ty, $body:expr) => {
+        {
+            let (left, right) = pop2!($env);
+            let result = ($body)(left as $t, right as $t) as $t;
+            push1!($env, result as u64 as i64);
+        }
     }
 }
 
@@ -283,19 +303,51 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     }
                 },
                 Opcode::I32Load => {
-                    load_val!(self.env, code, u32, read_u32);
+                    load_val!(self.env, code, u32, u32, read_u32);
+                },
+                Opcode::I32Load8U => {
+                    load_val!(self.env, code, u8, u32, read_u8);
+                },
+                Opcode::I32Load8S => {
+                    load_val!(self.env, code, i8, i32, read_u8);
+                },
+                Opcode::I32Load16U => {
+                    load_val!(self.env, code, u16, u32, read_u16);
+                },
+                Opcode::I32Load16S => {
+                    load_val!(self.env, code, i16, i32, read_u16);
                 },
                 Opcode::I32Store => {
-                    store_val!(self.env, code, u32, write_u32);
+                    store_val!(self.env, code, write_u32);
+                },
+                Opcode::I32Store8 => {
+                    store_val!(self.env, code, write_u8);
+                },
+                Opcode::I32Store16 => {
+                    store_val!(self.env, code, write_u16);
                 },
                 Opcode::I32Const => {
                     let v = code.next_u32()?;
                     push1!(self.env, v as i64);
                 },
-                Opcode::I32Add => {
-                    let (a, b) = pop2!(self.env);
-                    push1!(self.env, ((a as i32) + (b as i32)) as u64 as i64);
-                }
+                Opcode::I32Clz => run_unop!(self.env, i32, |v| unsafe { ::core::intrinsics::ctlz(v) }),
+                Opcode::I32Ctz => run_unop!(self.env, i32, |v| unsafe { ::core::intrinsics::cttz(v) }),
+                Opcode::I32Popcnt => run_unop!(self.env, i32, |v| unsafe { ::core::intrinsics::ctpop(v) }),
+                Opcode::I32Add => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_add(b)),
+                Opcode::I32Sub => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_sub(b)),
+                Opcode::I32Mul => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_mul(b)),
+                Opcode::I32DivU => run_binop!(self.env, u32, |a: u32, b: u32| a.wrapping_div(b)),
+                Opcode::I32DivS => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_div(b)),
+                Opcode::I32RemU => run_binop!(self.env, u32, |a: u32, b: u32| a.wrapping_rem(b)),
+                Opcode::I32RemS => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_rem(b)),
+                Opcode::I32And => run_binop!(self.env, u32, |a: u32, b: u32| a & b),
+                Opcode::I32Or => run_binop!(self.env, u32, |a: u32, b: u32| a | b),
+                Opcode::I32Xor => run_binop!(self.env, u32, |a: u32, b: u32| a ^ b),
+                Opcode::I32Shl => run_binop!(self.env, u32, |a: u32, b: u32| a.wrapping_shl(b)),
+                Opcode::I32ShrU => run_binop!(self.env, u32, |a: u32, b: u32| a.wrapping_shr(b)),
+                Opcode::I32ShrS => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_shr(b as u32)),
+                Opcode::I32Rotl => run_binop!(self.env, u32, |a: u32, b: u32| a.rotate_left(b)),
+                Opcode::I32Rotr => run_binop!(self.env, u32, |a: u32, b: u32| a.rotate_right(b)),
                 Opcode::Never => {
                     return Err(ExecuteError::IllegalOpcode)
                 }
