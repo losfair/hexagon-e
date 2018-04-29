@@ -8,6 +8,10 @@ pub trait Environment {
     fn get_memory_mut(&mut self) -> &mut [u8];
     fn grow_memory(&mut self, len_inc: usize) -> ExecuteResult<()>;
 
+    fn get_slots(&self) -> &[i64];
+    fn get_slots_mut(&mut self) -> &mut [i64];
+    fn reset_slots(&mut self, len: usize) -> ExecuteResult<()>;
+
     fn get_stack(&self) -> &Tape<Cell<i64>>;
 
     // Frame layout (from top to bottom):
@@ -22,6 +26,6 @@ pub trait Environment {
 
     fn trace_mem_init(&self, _start: usize, _data: &[u8]) {}
     fn trace_opcode(&self, _op: &Opcode) {}
-    fn trace_call(&self, _target: usize) {}
+    fn trace_call(&self, _target: usize, _n_locals: usize) {}
     fn trace_load(&self, _offset: usize, _addr: usize, _val: u64) {}
 }

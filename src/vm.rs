@@ -245,7 +245,7 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     let n_locals = vs.prev()?.get() as usize;
                     let target = vs.prev()?.get() as usize;
 
-                    self.env.trace_call(target);
+                    self.env.trace_call(target, n_locals);
 
                     // [all_locals]
                     for arg in vs.prev_many(n_args)? {
@@ -288,6 +288,37 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 Opcode::TeeLocal => {
                     let id = code.next_u32()? as usize;
                     tee_local!(self.env, id);
+                },
+                Opcode::GetSlotIndirect => {
+                    let id = pop1!(self.env) as usize;
+
+                    let slots = self.env.get_slots();
+                    bounds_check(slots, id, 1)?;
+
+                    let val = slots[id];
+                    push1!(self.env, val);
+                },
+                Opcode::GetSlot => {
+                    let id = code.next_u32()? as usize;
+
+                    let slots = self.env.get_slots();
+                    bounds_check(slots, id, 1)?;
+
+                    let val = slots[id];
+                    push1!(self.env, val);
+                },
+                Opcode::SetSlot => {
+                    let id = code.next_u32()? as usize;
+                    let val = pop1!(self.env);
+
+                    let slots = self.env.get_slots_mut();
+                    bounds_check(slots, id, 1)?;
+
+                    slots[id] = val;
+                },
+                Opcode::ResetSlots => {
+                    let n = code.next_u32()? as usize;
+                    self.env.reset_slots(n)?;
                 },
                 Opcode::NativeInvoke => {
                     let id = code.next_u32()? as usize;

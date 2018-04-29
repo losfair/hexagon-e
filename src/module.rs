@@ -46,6 +46,11 @@ pub enum Opcode {
     SetLocal,
     TeeLocal,
 
+    GetSlotIndirect,
+    GetSlot,
+    SetSlot,
+    ResetSlots,
+
     NativeInvoke,
 
     CurrentMemory,

@@ -8,16 +8,18 @@ use std::cell::Cell;
 use hexagon_e::environment::Environment;
 use hexagon_e::tape::Tape;
 use hexagon_e::error::ExecuteResult;
-use hexagon_e::module::Opcode;
+//use hexagon_e::module::Opcode;
 
 struct ResourceHolder {
     mem: Vec<u8>,
+    slots: Vec<i64>,
     stack: Vec<Cell<i64>>,
     call_stack: Vec<Cell<i64>>
 }
 
 struct ExecutionEnv<'a> {
     mem: &'a mut Vec<u8>,
+    slots: &'a mut Vec<i64>,
     stack: Tape<'a, Cell<i64>>,
     call_stack: Tape<'a, Cell<i64>>,
 }
@@ -26,6 +28,7 @@ impl<'a> ExecutionEnv<'a> {
     fn new(rh: &'a mut ResourceHolder) -> ExecutionEnv<'a> {
         ExecutionEnv {
             mem: &mut rh.mem,
+            slots: &mut rh.slots,
             stack: Tape::from(rh.stack.as_slice()),
             call_stack: Tape::from(rh.call_stack.as_slice())
         }
@@ -39,6 +42,19 @@ impl<'a> Environment for ExecutionEnv<'a> {
 
     fn get_memory_mut(&mut self) -> &mut [u8] {
         &mut self.mem
+    }
+
+    fn get_slots(&self) -> &[i64] {
+        &self.slots
+    }
+
+    fn get_slots_mut(&mut self) -> &mut [i64] {
+        &mut self.slots
+    }
+
+    fn reset_slots(&mut self, len: usize) -> ExecuteResult<()> {
+        *self.slots = vec! [ 0; len ];
+        Ok(())
     }
 
     fn grow_memory(&mut self, len_inc: usize) -> ExecuteResult<()> {
@@ -59,8 +75,8 @@ impl<'a> Environment for ExecutionEnv<'a> {
         println!("{:?}", op);
     }
 
-    fn trace_call(&self, target: usize) {
-        println!("call {}", target);
+    fn trace_call(&self, target: usize, n_locals: usize) {
+        println!("call {} (n_locals = {})", target, n_locals);
     }*/
 /*
     fn trace_load(&self, offset: usize, addr: usize, val: u64) {
@@ -89,6 +105,7 @@ fn main() {
 
     let mut rh = ResourceHolder {
         mem: vec! [ 0; 1048576 ],
+        slots: vec! [ 0; 65536 ],
         stack: vec! [ Cell::new(0); 1024 ],
         call_stack: vec! [ Cell::new(0); 1024 ]
     };
