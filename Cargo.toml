@@ -2,6 +2,11 @@
 name = "hexagon-e"
 version = "0.1.0"
 authors = ["losfair <zhy20000919@hotmail.com>"]
+description = "The HexagonE virtual machine"
+license = "LGPL-3.0"
+keywords = ["vm", "wasm", "webassembly"]
+repository = "https://github.com/losfair/hexagon-e"
+readme = "README.md"
 
 [dependencies]
 byteorder = { version = "1", default-features = false }
