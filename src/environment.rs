@@ -1,6 +1,7 @@
 use core::cell::Cell;
 use tape::Tape;
-use error::ExecuteResult;
+use module::Opcode;
+use error::*;
 
 pub trait Environment {
     fn get_memory(&self) -> &[u8];
@@ -14,4 +15,11 @@ pub trait Environment {
     // - n_all_locals /* n_args + n_locals */
     // - [all_locals]
     fn get_call_stack(&self) -> &Tape<Cell<i64>>;
+
+    fn do_native_invoke(&mut self, _id: usize) -> ExecuteResult<Option<i64>> {
+        Err(ExecuteError::InvalidNativeInvoke)
+    }
+
+    fn trace_opcode(&self, _op: &Opcode) {}
+    fn trace_call(&self, _target: usize) {}
 }

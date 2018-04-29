@@ -34,6 +34,8 @@ impl<'a> Module<'a> {
 #[repr(u8)]
 pub enum Opcode {
     Drop = 1,
+    Dup,
+    Swap2,
     Select,
 
     Call,
@@ -44,6 +46,8 @@ pub enum Opcode {
     SetLocal,
     TeeLocal,
 
+    NativeInvoke,
+
     CurrentMemory,
     GrowMemory,
 
@@ -52,6 +56,7 @@ pub enum Opcode {
 
     Jmp,
     JmpIf,
+    JmpEither,
     JmpTable,
 
     I32Load,

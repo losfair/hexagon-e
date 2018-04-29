@@ -3,7 +3,8 @@ pub enum ExecuteError {
     Generic,
     Bounds,
     Unreachable,
-    IllegalOpcode
+    IllegalOpcode,
+    InvalidNativeInvoke
 }
 
 pub type ExecuteResult<T> = Result<T, ExecuteError>;

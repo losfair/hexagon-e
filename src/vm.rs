@@ -193,10 +193,24 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
         let code = Tape::from(self.module.code);
         loop {
             let op = Opcode::from_raw(*(code.next()?))?;
+            self.env.trace_opcode(&op);
 
             match op {
                 Opcode::Drop => {
                     pop1!(self.env);
+                },
+                Opcode::Dup => {
+                    let stack = self.env.get_stack();
+                    let val = stack.tail_many(1)?[0].get();
+                    stack.next()?.set(val);
+                },
+                Opcode::Swap2 => {
+                    let stack = self.env.get_stack();
+                    let tail = stack.tail_many(2)?;
+                    let a = tail[0].get();
+                    let b = tail[1].get();
+                    tail[0].set(b);
+                    tail[1].set(a);
                 },
                 Opcode::Select => {
                     let (cond, val1, val2) = pop3!(self.env);
@@ -208,12 +222,14 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 },
                 Opcode::Call => {
                     let n_args = code.next_u32()? as usize;
-                    let n_locals = code.next_u32()? as usize;
 
                     let vs = self.env.get_stack();
                     let cs = self.env.get_call_stack();
 
-                    let target = vs.prev()?.get();
+                    let n_locals = vs.prev()?.get() as usize;
+                    let target = vs.prev()?.get() as usize;
+
+                    self.env.trace_call(target);
 
                     // [all_locals]
                     for arg in vs.prev_many(n_args)? {
@@ -230,7 +246,7 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     cs.next()?.set(code.get_pos() as _);
 
                     // Jump!
-                    code.set_pos(target as usize)?;
+                    code.set_pos(target)?;
                 },
                 Opcode::Return => {
                     let cs = self.env.get_call_stack();
@@ -257,6 +273,13 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     let id = code.next_u32()? as usize;
                     tee_local!(self.env, id);
                 },
+                Opcode::NativeInvoke => {
+                    let id = code.next_u32()? as usize;
+                    let ret = self.env.do_native_invoke(id)?;
+                    if let Some(v) = ret {
+                        push1!(self.env, v);
+                    }
+                },
                 Opcode::CurrentMemory => {
                     let len = self.env.get_memory().len();
                     push1!(self.env, len as _);
@@ -282,6 +305,16 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     let cond = pop1!(self.env);
                     if cond != 0 {
                         code.set_pos(target)?;
+                    }
+                },
+                Opcode::JmpEither => {
+                    let target_a = code.next_u32()? as usize;
+                    let target_b = code.next_u32()? as usize;
+                    let cond = pop1!(self.env);
+                    if cond != 0 {
+                        code.set_pos(target_a)?;
+                    } else {
+                        code.set_pos(target_b)?;
                     }
                 },
                 Opcode::JmpTable => {
