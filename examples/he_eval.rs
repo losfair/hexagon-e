@@ -54,13 +54,26 @@ impl<'a> Environment for ExecutionEnv<'a> {
         &self.call_stack
     }
 
+/*
     fn trace_opcode(&self, op: &Opcode) {
         println!("{:?}", op);
     }
 
     fn trace_call(&self, target: usize) {
         println!("call {}", target);
+    }*/
+/*
+    fn trace_load(&self, offset: usize, addr: usize, val: u64) {
+        println!("load {} + {} -> {}", offset, addr, val);
     }
+
+    fn trace_mem_init(&self, start: usize, data: &[u8]) {
+        println!("mem_init {}, len = {}", start, data.len());
+        if data.len() < 1024 {
+            println!("data = {:?}", data);
+        }
+    }
+*/
 }
 
 fn main() {

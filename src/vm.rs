@@ -116,10 +116,11 @@ macro_rules! tee_local {
 macro_rules! load_val {
     ($env:expr, $code:expr, $t1: ty, $t2: ty, $read:ident) => {
         let offset = $code.next_u32()? as usize;
-        let addr = pop1!($env) as usize;
+        let addr = pop1!($env) as u32 as usize;
 
         let real_addr = offset + addr;
         let val = $env.get_memory().$read(real_addr)? as $t1 as $t2;
+        $env.trace_load(offset, addr, val as u64);
         push1!($env, val as u64 as _);
     }
 }
@@ -128,7 +129,7 @@ macro_rules! store_val {
     ($env:expr, $code:expr, $write:ident) => {
         let offset = $code.next_u32()? as usize;
         let val = pop1!($env) as u64 as _;
-        let addr = pop1!($env) as usize;
+        let addr = pop1!($env) as u32 as usize;
 
         let real_addr = offset + addr;
         $env.get_memory_mut().$write(real_addr, val)?;
@@ -155,6 +156,16 @@ macro_rules! run_binop {
     }
 }
 
+macro_rules! run_relop {
+    ($env:expr, $t:ty, $body:expr) => {
+        {
+            let (left, right) = pop2!($env);
+            let result = ($body)(left as $t, right as $t);
+            push1!($env, if result == true { 1 } else { 0 });
+        }
+    }
+}
+
 impl<'a, E: Environment> VirtualMachine<'a, E> {
     pub fn new(
         module: &Module<'a>,
@@ -167,7 +178,6 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
     }
 
     pub fn run_memory_initializers(&mut self) -> ExecuteResult<()> {
-        let mem = self.env.get_memory_mut();
         let mi = Tape::from(self.module.memory_initializers);
 
         loop {
@@ -179,11 +189,17 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
             let data_len = mi.next_u32()? as usize;
             let data = mi.next_many(data_len)?;
 
-            if addr >= mem.len() || addr + data_len > mem.len() {
-                return Err(ExecuteError::Bounds);
+            {
+                let mem = self.env.get_memory_mut();
+
+                if addr >= mem.len() || addr + data_len > mem.len() {
+                    return Err(ExecuteError::Bounds);
+                }
+
+                mem[addr..addr + data_len].copy_from_slice(data);
             }
 
-            mem[addr..addr + data_len].copy_from_slice(data);
+            self.env.trace_mem_init(addr as usize, data);
         }
 
         Ok(())
@@ -296,6 +312,9 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 Opcode::Unreachable => {
                     return Err(ExecuteError::Unreachable);
                 },
+                Opcode::NotSupported => {
+                    return Err(ExecuteError::NotSupported);
+                },
                 Opcode::Jmp => {
                     let target = code.next_u32()? as usize;
                     code.set_pos(target)?;
@@ -381,8 +400,88 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 Opcode::I32ShrS => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_shr(b as u32)),
                 Opcode::I32Rotl => run_binop!(self.env, u32, |a: u32, b: u32| a.rotate_left(b)),
                 Opcode::I32Rotr => run_binop!(self.env, u32, |a: u32, b: u32| a.rotate_right(b)),
+                Opcode::I32Eq => run_relop!(self.env, u32, |a: u32, b: u32| a == b),
+                Opcode::I32Ne => run_relop!(self.env, u32, |a: u32, b: u32| a != b),
+                Opcode::I32LtU => run_relop!(self.env, u32, |a: u32, b: u32| a < b),
+                Opcode::I32LtS => run_relop!(self.env, i32, |a: i32, b: i32| a < b),
+                Opcode::I32LeU => run_relop!(self.env, u32, |a: u32, b: u32| a <= b),
+                Opcode::I32LeS => run_relop!(self.env, i32, |a: i32, b: i32| a <= b),
+                Opcode::I32GtU => run_relop!(self.env, u32, |a: u32, b: u32| a > b),
+                Opcode::I32GtS => run_relop!(self.env, i32, |a: i32, b: i32| a > b),
+                Opcode::I32GeU => run_relop!(self.env, u32, |a: u32, b: u32| a >= b),
+                Opcode::I32GeS => run_relop!(self.env, i32, |a: i32, b: i32| a >= b),
+
+                Opcode::I32WrapI64 => run_unop!(self.env, u32, |v: u32| v),
+
+                Opcode::I64Load => {
+                    load_val!(self.env, code, u64, u64, read_u64);
+                },
+                Opcode::I64Load8U => {
+                    load_val!(self.env, code, u8, u64, read_u8);
+                },
+                Opcode::I64Load8S => {
+                    load_val!(self.env, code, i8, i64, read_u8);
+                },
+                Opcode::I64Load16U => {
+                    load_val!(self.env, code, u16, u64, read_u16);
+                },
+                Opcode::I64Load16S => {
+                    load_val!(self.env, code, i16, i64, read_u16);
+                },
+                Opcode::I64Load32U => {
+                    load_val!(self.env, code, u32, u64, read_u32);
+                },
+                Opcode::I64Load32S => {
+                    load_val!(self.env, code, i32, i64, read_u32);
+                },
+                Opcode::I64Store => {
+                    store_val!(self.env, code, write_u64);
+                },
+                Opcode::I64Store8 => {
+                    store_val!(self.env, code, write_u8);
+                },
+                Opcode::I64Store16 => {
+                    store_val!(self.env, code, write_u16);
+                },
+                Opcode::I64Store32 => {
+                    store_val!(self.env, code, write_u32);
+                },
+                Opcode::I64Const => {
+                    let v = code.next_u64()?;
+                    push1!(self.env, v as i64);
+                },
+                Opcode::I64Clz => run_unop!(self.env, i64, |v| unsafe { ::core::intrinsics::ctlz(v) }),
+                Opcode::I64Ctz => run_unop!(self.env, i64, |v| unsafe { ::core::intrinsics::cttz(v) }),
+                Opcode::I64Popcnt => run_unop!(self.env, i64, |v| unsafe { ::core::intrinsics::ctpop(v) }),
+                Opcode::I64Add => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_add(b)),
+                Opcode::I64Sub => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_sub(b)),
+                Opcode::I64Mul => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_mul(b)),
+                Opcode::I64DivU => run_binop!(self.env, u64, |a: u64, b: u64| a.wrapping_div(b)),
+                Opcode::I64DivS => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_div(b)),
+                Opcode::I64RemU => run_binop!(self.env, u64, |a: u64, b: u64| a.wrapping_rem(b)),
+                Opcode::I64RemS => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_rem(b)),
+                Opcode::I64And => run_binop!(self.env, u64, |a: u64, b: u64| a & b),
+                Opcode::I64Or => run_binop!(self.env, u64, |a: u64, b: u64| a | b),
+                Opcode::I64Xor => run_binop!(self.env, u64, |a: u64, b: u64| a ^ b),
+                Opcode::I64Shl => run_binop!(self.env, u64, |a: u64, b: u64| a.wrapping_shl(b as u32)),
+                Opcode::I64ShrU => run_binop!(self.env, u64, |a: u64, b: u64| a.wrapping_shr(b as u32)),
+                Opcode::I64ShrS => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_shr(b as u32)),
+                Opcode::I64Rotl => run_binop!(self.env, u64, |a: u64, b: u64| a.rotate_left(b as u32)),
+                Opcode::I64Rotr => run_binop!(self.env, u64, |a: u64, b: u64| a.rotate_right(b as u32)),
+                Opcode::I64Eq => run_relop!(self.env, u64, |a: u64, b: u64| a == b),
+                Opcode::I64Ne => run_relop!(self.env, u64, |a: u64, b: u64| a != b),
+                Opcode::I64LtU => run_relop!(self.env, u64, |a: u64, b: u64| a < b),
+                Opcode::I64LtS => run_relop!(self.env, i64, |a: i64, b: i64| a < b),
+                Opcode::I64LeU => run_relop!(self.env, u64, |a: u64, b: u64| a <= b),
+                Opcode::I64LeS => run_relop!(self.env, i64, |a: i64, b: i64| a <= b),
+                Opcode::I64GtU => run_relop!(self.env, u64, |a: u64, b: u64| a > b),
+                Opcode::I64GtS => run_relop!(self.env, i64, |a: i64, b: i64| a > b),
+                Opcode::I64GeU => run_relop!(self.env, u64, |a: u64, b: u64| a >= b),
+                Opcode::I64GeS => run_relop!(self.env, i64, |a: i64, b: i64| a >= b),
+                Opcode::I64ExtendI32U => run_unop!(self.env, u64, |v: u64| v as u32 as u64),
+                Opcode::I64ExtendI32S => run_unop!(self.env, u64, |v: u64| v as u32 as i32 as i64 as u64),
                 Opcode::Never => {
-                    return Err(ExecuteError::IllegalOpcode)
+                    return Err(ExecuteError::IllegalOpcode(Opcode::Never as u8))
                 }
             }
         }
@@ -412,45 +511,45 @@ fn bounds_check<T>(target: &[T], start: usize, len: usize) -> ExecuteResult<()> 
 impl Memory for [u8] {
     fn read_u8(&self, ra: usize) -> ExecuteResult<u8> {
         bounds_check(self, ra, 1)?;
-        Ok(self[0])
+        Ok(self[ra])
     }
 
     fn read_u16(&self, ra: usize) -> ExecuteResult<u16> {
         bounds_check(self, ra, 2)?;
-        Ok(LittleEndian::read_u16(self))
+        Ok(LittleEndian::read_u16(&self[ra..]))
     }
 
     fn read_u32(&self, ra: usize) -> ExecuteResult<u32> {
         bounds_check(self, ra, 4)?;
-        Ok(LittleEndian::read_u32(self))
+        Ok(LittleEndian::read_u32(&self[ra..]))
     }
 
     fn read_u64(&self, ra: usize) -> ExecuteResult<u64> {
         bounds_check(self, ra, 8)?;
-        Ok(LittleEndian::read_u64(self))
+        Ok(LittleEndian::read_u64(&self[ra..]))
     }
 
     fn write_u8(&mut self, ra: usize, v: u8) -> ExecuteResult<()> {
         bounds_check(self, ra, 1)?;
-        self[0] = v;
+        self[ra] = v;
         Ok(())
     }
 
     fn write_u16(&mut self, ra: usize, v: u16) -> ExecuteResult<()> {
         bounds_check(self, ra, 2)?;
-        LittleEndian::write_u16(self, v);
+        LittleEndian::write_u16(&mut self[ra..], v);
         Ok(())
     }
 
     fn write_u32(&mut self, ra: usize, v: u32) -> ExecuteResult<()> {
         bounds_check(self, ra, 4)?;
-        LittleEndian::write_u32(self, v);
+        LittleEndian::write_u32(&mut self[ra..], v);
         Ok(())
     }
 
     fn write_u64(&mut self, ra: usize, v: u64) -> ExecuteResult<()> {
         bounds_check(self, ra, 8)?;
-        LittleEndian::write_u64(self, v);
+        LittleEndian::write_u64(&mut self[ra..], v);
         Ok(())
     }
 }

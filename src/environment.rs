@@ -20,6 +20,8 @@ pub trait Environment {
         Err(ExecuteError::InvalidNativeInvoke)
     }
 
+    fn trace_mem_init(&self, _start: usize, _data: &[u8]) {}
     fn trace_opcode(&self, _op: &Opcode) {}
     fn trace_call(&self, _target: usize) {}
+    fn trace_load(&self, _offset: usize, _addr: usize, _val: u64) {}
 }

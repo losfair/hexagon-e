@@ -105,9 +105,11 @@ impl<'a, T: 'static> Tape<'a, T> {
 
 pub trait TapeU8 {
     fn next_u32(&self) -> ExecuteResult<u32>;
+    fn next_u64(&self) -> ExecuteResult<u64>;
 }
 
 impl<'a> TapeU8 for Tape<'a, u8> {
+    #[inline]
     fn next_u32(&self) -> ExecuteResult<u32> {
         if self.remaining() < 4 {
             Err(ExecuteError::Bounds)
@@ -117,6 +119,21 @@ impl<'a> TapeU8 for Tape<'a, u8> {
             let pos = self.pos.get();
             let v = LittleEndian::read_u32(&self.data[pos..pos + 4]);
             self.pos.set(pos + 4);
+
+            Ok(v)
+        }
+    }
+
+    #[inline]
+    fn next_u64(&self) -> ExecuteResult<u64> {
+        if self.remaining() < 8 {
+            Err(ExecuteError::Bounds)
+        } else {
+            use byteorder::{LittleEndian, ByteOrder};
+
+            let pos = self.pos.get();
+            let v = LittleEndian::read_u64(&self.data[pos..pos + 8]);
+            self.pos.set(pos + 8);
 
             Ok(v)
         }
