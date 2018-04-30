@@ -232,7 +232,7 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     tail[1].set(a);
                 },
                 Opcode::Select => {
-                    let (cond, val1, val2) = pop3!(self.env);
+                    let (val1, val2, cond) = pop3!(self.env);
                     if cond != 0 {
                         push1!(self.env, val1);
                     } else {
