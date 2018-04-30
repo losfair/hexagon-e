@@ -209,7 +209,7 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
         let code = Tape::from(self.module.code);
         loop {
             let op = Opcode::from_raw(*(code.next()?))?;
-            self.env.trace_opcode(&op);
+            self.env.trace_opcode(&op)?;
 
             match op {
                 Opcode::Drop => {
