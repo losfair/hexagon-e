@@ -1,11 +1,24 @@
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
 pub enum ExecuteError {
-    Generic,
+    Generic = 1,
     Bounds,
     Unreachable,
-    IllegalOpcode(u8),
+    IllegalOpcode,
     InvalidNativeInvoke,
-    NotSupported
+    NotSupported,
+    InvalidInput,
+    ExecutionLimit,
+    MemoryLimit,
+    SlotLimit,
+    FatalSignal,
+    Fuse
 }
 
 pub type ExecuteResult<T> = Result<T, ExecuteError>;
+
+impl ExecuteError {
+    pub fn status(&self) -> i32 {
+        -(*self as u8 as i32)
+    }
+}

@@ -6,7 +6,9 @@ use error::*;
 
 pub struct VirtualMachine<'a, E: Environment> {
     pub module: Module<'a>,
-    pub env: E
+    pub env: E,
+
+    reset_slots_fuse: bool
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -173,7 +175,8 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
     ) -> VirtualMachine<'a, E> {
         VirtualMachine {
             module: *module,
-            env: env
+            env: env,
+            reset_slots_fuse: false
         }
     }
 
@@ -318,6 +321,12 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 },
                 Opcode::ResetSlots => {
                     let n = code.next_u32()? as usize;
+
+                    if self.reset_slots_fuse {
+                        return Err(ExecuteError::Fuse);
+                    }
+                    self.reset_slots_fuse = true;
+
                     self.env.reset_slots(n)?;
                 },
                 Opcode::NativeInvoke => {
@@ -512,7 +521,7 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 Opcode::I64ExtendI32U => run_unop!(self.env, u64, |v: u64| v as u32 as u64),
                 Opcode::I64ExtendI32S => run_unop!(self.env, u64, |v: u64| v as u32 as i32 as i64 as u64),
                 Opcode::Never => {
-                    return Err(ExecuteError::IllegalOpcode(Opcode::Never as u8))
+                    return Err(ExecuteError::IllegalOpcode)
                 }
             }
         }

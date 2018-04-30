@@ -162,7 +162,7 @@ impl Opcode {
         if v > 0 && v < Opcode::Never as u8 {
             Ok(unsafe { ::core::mem::transmute(v) })
         } else {
-            Err(ExecuteError::IllegalOpcode(v))
+            Err(ExecuteError::IllegalOpcode)
         }
     }
 }
