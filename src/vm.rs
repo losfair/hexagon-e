@@ -148,6 +148,21 @@ macro_rules! run_unop {
     }
 }
 
+macro_rules! run_binop_checking_div_by_zero {
+    ($env:expr, $t:ty, $body:expr) => {
+        {
+            let (left, right) = pop2!($env);
+
+            if (right as $t) == 0 {
+                return Err(ExecuteError::DivideByZero);
+            }
+
+            let result = ($body)(left as $t, right as $t) as $t;
+            push1!($env, result as u64 as i64);
+        }
+    }
+}
+
 macro_rules! run_binop {
     ($env:expr, $t:ty, $body:expr) => {
         {
@@ -428,10 +443,10 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 Opcode::I32Add => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_add(b)),
                 Opcode::I32Sub => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_sub(b)),
                 Opcode::I32Mul => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_mul(b)),
-                Opcode::I32DivU => run_binop!(self.env, u32, |a: u32, b: u32| a.wrapping_div(b)),
-                Opcode::I32DivS => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_div(b)),
-                Opcode::I32RemU => run_binop!(self.env, u32, |a: u32, b: u32| a.wrapping_rem(b)),
-                Opcode::I32RemS => run_binop!(self.env, i32, |a: i32, b: i32| a.wrapping_rem(b)),
+                Opcode::I32DivU => run_binop_checking_div_by_zero!(self.env, u32, |a: u32, b: u32| a.wrapping_div(b)),
+                Opcode::I32DivS => run_binop_checking_div_by_zero!(self.env, i32, |a: i32, b: i32| a.wrapping_div(b)),
+                Opcode::I32RemU => run_binop_checking_div_by_zero!(self.env, u32, |a: u32, b: u32| a.wrapping_rem(b)),
+                Opcode::I32RemS => run_binop_checking_div_by_zero!(self.env, i32, |a: i32, b: i32| a.wrapping_rem(b)),
                 Opcode::I32And => run_binop!(self.env, u32, |a: u32, b: u32| a & b),
                 Opcode::I32Or => run_binop!(self.env, u32, |a: u32, b: u32| a | b),
                 Opcode::I32Xor => run_binop!(self.env, u32, |a: u32, b: u32| a ^ b),
@@ -496,10 +511,10 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 Opcode::I64Add => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_add(b)),
                 Opcode::I64Sub => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_sub(b)),
                 Opcode::I64Mul => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_mul(b)),
-                Opcode::I64DivU => run_binop!(self.env, u64, |a: u64, b: u64| a.wrapping_div(b)),
-                Opcode::I64DivS => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_div(b)),
-                Opcode::I64RemU => run_binop!(self.env, u64, |a: u64, b: u64| a.wrapping_rem(b)),
-                Opcode::I64RemS => run_binop!(self.env, i64, |a: i64, b: i64| a.wrapping_rem(b)),
+                Opcode::I64DivU => run_binop_checking_div_by_zero!(self.env, u64, |a: u64, b: u64| a.wrapping_div(b)),
+                Opcode::I64DivS => run_binop_checking_div_by_zero!(self.env, i64, |a: i64, b: i64| a.wrapping_div(b)),
+                Opcode::I64RemU => run_binop_checking_div_by_zero!(self.env, u64, |a: u64, b: u64| a.wrapping_rem(b)),
+                Opcode::I64RemS => run_binop_checking_div_by_zero!(self.env, i64, |a: i64, b: i64| a.wrapping_rem(b)),
                 Opcode::I64And => run_binop!(self.env, u64, |a: u64, b: u64| a & b),
                 Opcode::I64Or => run_binop!(self.env, u64, |a: u64, b: u64| a | b),
                 Opcode::I64Xor => run_binop!(self.env, u64, |a: u64, b: u64| a ^ b),

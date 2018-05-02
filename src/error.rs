@@ -12,7 +12,8 @@ pub enum ExecuteError {
     MemoryLimit,
     SlotLimit,
     FatalSignal,
-    Fuse
+    Fuse,
+    DivideByZero
 }
 
 pub type ExecuteResult<T> = Result<T, ExecuteError>;
