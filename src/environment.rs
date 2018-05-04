@@ -28,4 +28,5 @@ pub trait Environment {
     fn trace_opcode(&self, _op: &Opcode) -> ExecuteResult<()> { Ok(()) }
     fn trace_call(&self, _target: usize, _n_locals: usize) {}
     fn trace_load(&self, _offset: usize, _addr: usize, _val: u64) {}
+    fn trace_branch(&self, _target: usize) -> ExecuteResult<()> { Ok(()) }
 }

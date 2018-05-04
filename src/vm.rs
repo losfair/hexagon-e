@@ -264,6 +264,7 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     let target = vs.prev()?.get() as usize;
 
                     self.env.trace_call(target, n_locals);
+                    self.env.trace_branch(target)?;
 
                     // [all_locals]
                     for arg in vs.prev_many(n_args)? {
@@ -285,12 +286,14 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 Opcode::Return => {
                     let cs = self.env.get_call_stack();
 
-                    let return_ip = cs.prev()?.get();
+                    let return_ip = cs.prev()?.get() as usize;
                     let n_all_locals = cs.prev()?.get();
 
                     cs.prev_many(n_all_locals as _)?;
 
-                    code.set_pos(return_ip as _)?;
+                    self.env.trace_branch(return_ip)?;
+
+                    code.set_pos(return_ip)?;
                 },
                 Opcode::Halt => {
                     return Ok(());
@@ -372,12 +375,14 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                 },
                 Opcode::Jmp => {
                     let target = code.next_u32()? as usize;
+                    self.env.trace_branch(target)?;
                     code.set_pos(target)?;
                 },
                 Opcode::JmpIf => {
                     let target = code.next_u32()? as usize;
                     let cond = pop1!(self.env);
                     if cond != 0 {
+                        self.env.trace_branch(target)?;
                         code.set_pos(target)?;
                     }
                 },
@@ -386,8 +391,10 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     let target_b = code.next_u32()? as usize;
                     let cond = pop1!(self.env);
                     if cond != 0 {
+                        self.env.trace_branch(target_a)?;
                         code.set_pos(target_a)?;
                     } else {
+                        self.env.trace_branch(target_b)?;
                         code.set_pos(target_b)?;
                     }
                 },
@@ -399,13 +406,15 @@ impl<'a, E: Environment> VirtualMachine<'a, E> {
                     let table = code.next_many(table_len * 4)?; // 32-bit
 
                     if cond >= table_len {
-                        code.set_pos(default_target as _)?;
+                        self.env.trace_branch(default_target)?;
+                        code.set_pos(default_target)?;
                     } else {
                         // cond < table_len
                         // => cond + 1 <= table_len
                         // => cond * 4 + 4 <= table_len * 4
                         // table.len() == table_len * 4
                         let target = LittleEndian::read_u32(&table[cond * 4 .. cond * 4 + 4]) as usize;
+                        self.env.trace_branch(target)?;
                         code.set_pos(target)?;
                     }
                 },
